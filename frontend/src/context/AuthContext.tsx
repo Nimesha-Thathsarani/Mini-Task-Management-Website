@@ -38,14 +38,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (token: string, userData: User) => {
-    Cookies.set('token', token, { expires: 1 }); // 1 day expire
-    Cookies.set('user', JSON.stringify(userData), { expires: 1 });
+    Cookies.set('token', token, { expires: 1, path: '/' }); // 1 day expire
+    Cookies.set('user', JSON.stringify(userData), { expires: 1, path: '/' });
     setUser(userData);
   };
 
   const logout = () => {
-    Cookies.remove('token');
-    Cookies.remove('user');
+    Cookies.remove('token', { path: '/' });
+    Cookies.remove('user', { path: '/' });
     setUser(null);
     if (typeof window !== 'undefined') {
         window.location.href = '/login';

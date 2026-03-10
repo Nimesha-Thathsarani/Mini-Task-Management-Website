@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import axios from '@/lib/axios';
+import api from '@/lib/axios';
 import { useRouter } from 'next/navigation';
 import { 
   CheckCircle2, Circle, Clock, MoreVertical, Plus, 
@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState<Partial<Task> | null>(null);
   
-  const isAdmin = user?.roles.includes('ROLE_ADMIN');
+  const isAdmin = user?.roles?.includes('ROLE_ADMIN');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -50,11 +50,14 @@ export default function Dashboard() {
       if (statusFilter) params.append('status', statusFilter);
       if (priorityFilter) params.append('priority', priorityFilter);
 
-      const res = await axios.get(`/tasks?${params.toString()}`);
+      const res = await api.get(`/tasks?${params.toString()}`);
       setTasks(res.data.content);
       setTotalPages(res.data.totalPages);
-    } catch (error) {
-      console.error("Error fetching tasks", error);
+    } catch (error: any) {
+      console.error("Error fetching tasks:", error);
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+      }
     }
   };
 
@@ -67,7 +70,7 @@ export default function Dashboard() {
   const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this task?")) {
       try {
-        await axios.delete(`/tasks/${id}`);
+        await api.delete(`/tasks/${id}`);
         fetchTasks();
       } catch (e) {
         alert("Failed to delete task.");
@@ -79,9 +82,9 @@ export default function Dashboard() {
     e.preventDefault();
     try {
       if (currentTask?.id) {
-        await axios.put(`/tasks/${currentTask.id}`, currentTask);
+        await api.put(`/tasks/${currentTask.id}`, currentTask);
       } else {
-        await axios.post('/tasks', currentTask);
+        await api.post('/tasks', currentTask);
       }
       setIsModalOpen(false);
       setCurrentTask(null);

@@ -6,7 +6,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import com.minitask.backend.models.Task;
@@ -19,6 +18,7 @@ import com.minitask.backend.repository.TaskRepository;
 import com.minitask.backend.repository.UserRepository;
 import com.minitask.backend.security.services.UserDetailsImpl;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
@@ -34,53 +34,68 @@ public class TaskController {
         return userRepository.findById(userDetails.getId()).orElseThrow(() -> new RuntimeException("User not found"));
     }
 
+    private LocalDateTime parseDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) return null;
+        try {
+            if (dateStr.length() == 16) dateStr += ":00";
+            return LocalDateTime.parse(dateStr);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @GetMapping
     public ResponseEntity<Page<Task>> getTasks(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String priority,
-            @RequestParam(defaultValue = "dueDate") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "priority", required = false) String priority,
+            @RequestParam(name = "sortBy", defaultValue = "dueDate") String sortBy,
+            @RequestParam(name = "sortDir", defaultValue = "asc") String sortDir) {
 
         User currentUser = getCurrentUser();
-        boolean isAdmin = currentUser.getRole().name().equals("ADMIN");
+        boolean isAdmin = currentUser.getRole() != null && currentUser.getRole().name().equals("ADMIN");
 
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        TaskStatus taskStatus = status != null ? TaskStatus.valueOf(status.toUpperCase()) : null;
-        TaskPriority taskPriority = priority != null ? TaskPriority.valueOf(priority.toUpperCase()) : null;
-
-        Page<Task> tasks;
-
-        if (isAdmin) {
-            if (taskStatus != null && taskPriority != null) {
-                tasks = taskRepository.findByStatusAndPriority(taskStatus, taskPriority, pageable);
-            } else if (taskStatus != null) {
-                tasks = taskRepository.findByStatus(taskStatus, pageable);
-            } else if (taskPriority != null) {
-                tasks = taskRepository.findByPriority(taskPriority, pageable);
-            } else {
-                tasks = taskRepository.findAll(pageable);
+            Sort sort;
+            try {
+                sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+            } catch (Exception e) {
+                sort = Sort.by("id").descending();
             }
-        } else {
-            if (taskStatus != null && taskPriority != null) {
-                tasks = taskRepository.findByUserIdAndStatusAndPriority(currentUser.getId(), taskStatus, taskPriority, pageable);
-            } else if (taskStatus != null) {
-                tasks = taskRepository.findByUserIdAndStatus(currentUser.getId(), taskStatus, pageable);
-            } else if (taskPriority != null) {
-                tasks = taskRepository.findByUserIdAndPriority(currentUser.getId(), taskPriority, pageable);
+            Pageable pageable = PageRequest.of(page, size, sort);
+
+            TaskStatus taskStatus = (status != null && !status.trim().isEmpty()) ? TaskStatus.valueOf(status.toUpperCase()) : null;
+            TaskPriority taskPriority = (priority != null && !priority.trim().isEmpty()) ? TaskPriority.valueOf(priority.toUpperCase()) : null;
+
+            Page<Task> tasks;
+
+            if (isAdmin) {
+                if (taskStatus != null && taskPriority != null) {
+                    tasks = taskRepository.findByStatusAndPriority(taskStatus, taskPriority, pageable);
+                } else if (taskStatus != null) {
+                    tasks = taskRepository.findByStatus(taskStatus, pageable);
+                } else if (taskPriority != null) {
+                    tasks = taskRepository.findByPriority(taskPriority, pageable);
+                } else {
+                    tasks = taskRepository.findAll(pageable);
+                }
             } else {
-                tasks = taskRepository.findByUserId(currentUser.getId(), pageable);
+                if (taskStatus != null && taskPriority != null) {
+                    tasks = taskRepository.findByUserIdAndStatusAndPriority(currentUser.getId(), taskStatus, taskPriority, pageable);
+                } else if (taskStatus != null) {
+                    tasks = taskRepository.findByUserIdAndStatus(currentUser.getId(), taskStatus, pageable);
+                } else if (taskPriority != null) {
+                    tasks = taskRepository.findByUserIdAndPriority(currentUser.getId(), taskPriority, pageable);
+                } else {
+                    tasks = taskRepository.findByUserId(currentUser.getId(), pageable);
+                }
             }
-        }
 
         return ResponseEntity.ok(tasks);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getTaskById(@PathVariable Long id) {
+    public ResponseEntity<?> getTaskById(@PathVariable("id") Long id) {
         Optional<Task> taskData = taskRepository.findById(id);
         if (taskData.isPresent()) {
             Task task = taskData.get();
@@ -101,7 +116,7 @@ public class TaskController {
         task.setDescription(taskRequest.getDescription());
         task.setStatus(TaskStatus.valueOf(taskRequest.getStatus().toUpperCase()));
         task.setPriority(TaskPriority.valueOf(taskRequest.getPriority().toUpperCase()));
-        task.setDueDate(taskRequest.getDueDate());
+        task.setDueDate(parseDate(taskRequest.getDueDate()));
         task.setUser(getCurrentUser());
 
         taskRepository.save(task);
@@ -109,7 +124,7 @@ public class TaskController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateTask(@PathVariable Long id, @Valid @RequestBody TaskRequest taskRequest) {
+    public ResponseEntity<?> updateTask(@PathVariable("id") Long id, @Valid @RequestBody TaskRequest taskRequest) {
         Optional<Task> taskData = taskRepository.findById(id);
         if (taskData.isPresent()) {
             Task task = taskData.get();
@@ -123,7 +138,7 @@ public class TaskController {
             task.setDescription(taskRequest.getDescription());
             task.setStatus(TaskStatus.valueOf(taskRequest.getStatus().toUpperCase()));
             task.setPriority(TaskPriority.valueOf(taskRequest.getPriority().toUpperCase()));
-            task.setDueDate(taskRequest.getDueDate());
+            task.setDueDate(parseDate(taskRequest.getDueDate()));
 
             taskRepository.save(task);
             return ResponseEntity.ok(new MessageResponse("Task updated successfully!"));
@@ -133,7 +148,7 @@ public class TaskController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteTask(@PathVariable Long id) {
+    public ResponseEntity<?> deleteTask(@PathVariable("id") Long id) {
         Optional<Task> taskData = taskRepository.findById(id);
         if (taskData.isPresent()) {
             Task task = taskData.get();

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from '@/lib/axios';
-import { Mail, Lock, Loader2, ArrowRight, UserPlus } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, UserPlus, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RegisterPage() {
@@ -41,7 +41,10 @@ export default function RegisterPage() {
       
       <div className="bg-white/90 w-full max-w-md p-8 rounded-[2rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] z-10 relative overflow-hidden border border-white">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500"></div>
-        <div className="text-center mb-8 flex flex-col items-center">
+        <Link href="/" className="absolute top-6 left-6 text-slate-400 hover:text-purple-600 transition-colors" aria-label="Back to Home">
+          <ArrowLeft size={24} />
+        </Link>
+        <div className="text-center mb-8 mt-2 flex flex-col items-center">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-orange-500 flex items-center justify-center mb-5 shadow-lg shadow-purple-500/20">
              <UserPlus size={32} className="text-white" />
           </div>
